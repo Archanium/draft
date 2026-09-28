@@ -75,7 +75,7 @@ fix_file() {
     # the normalised result is whitespace-only, the pipeline above went wrong
     # (e.g. a non-GNU sed erroring out). Refuse to overwrite rather than
     # truncate the file to nothing.
-    if grep -q '[^[:space:]]' "$file" && ! printf '%s' "$fixed" | grep -q '[^[:space:]]'; then
+    if grep -q '[^[:space:]]' "$file" && ! grep -q '[^[:space:]]' <<<"$fixed"; then
         echo "  ERROR (normalisation produced empty output; refusing to overwrite): $file" >&2
         return 2
     fi

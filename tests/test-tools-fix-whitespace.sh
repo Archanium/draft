@@ -103,6 +103,29 @@ run "$INTERIOR"
 assert "interior blank line preserved (byte-identical, idempotent)" \
     "$([[ "$(cat "$INTERIOR")" == "$(printf 'a\n\nb')" ]] && echo true || echo false)"
 
+# --- A failing normalisation stage must not truncate the file ---
+# Any stage erroring out yields empty output; the guard must refuse the write.
+SHIM="$FIXTURE/shim"
+mkdir -p "$SHIM"
+printf '#!/bin/sh\nexit 1\n' > "$SHIM/awk"
+chmod +x "$SHIM/awk"
+GUARD="$FIXTURE/guard.md"
+printf '# Title   \nbody\n\n' > "$GUARD"
+BEFORE="$(cksum < "$GUARD")"
+set +e; OUT="$(PATH="$SHIM:$PATH" "$TOOL" "$GUARD" 2>&1)"; RC=$?; set -e
+assert "failing stage → exit 2" "$([[ "$RC" == "2" ]] && echo true || echo false)"
+assert "failing stage → file untouched" "$([[ "$(cksum < "$GUARD")" == "$BEFORE" ]] && echo true || echo false)"
+
+# --- Large files normalise; the guard must not misfire ---
+# grep -q exits at its first match; a pipe feeding it more than the pipe buffer
+# took SIGPIPE, which pipefail turned into a false "empty output" refusal.
+BIG="$FIXTURE/big.md"
+awk 'BEGIN { for (i = 0; i < 200000; i++) print "line   " }' > "$BIG"
+run "$BIG"
+assert "1 MB file → exit 0" "$([[ "$RC" == "0" ]] && echo true || echo false)"
+assert "1 MB file → trailing whitespace stripped" \
+    "$(grep -q ' $' "$BIG" && echo false || echo true)"
+
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
 exit "$FAIL"
